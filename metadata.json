@@ -1,6 +1,6 @@
 {
-  "name": "Hemant Gurjar HRMS",
-  "description": "An offline-first Android HRMS client similar to Zoho People, providing Geo-location based punch-in/out attendance, monthly summary, and leave balance tracking and requests.",
+  "name": "ALLEN HR",
+  "description": "An offline-first Android HRMS client, providing Geo-location based punch-in/out attendance, monthly summary, and leave balance tracking and requests.",
   "requestFramePermissions": [],
   "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
 }

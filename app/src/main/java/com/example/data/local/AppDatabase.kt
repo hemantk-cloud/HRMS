@@ -7,15 +7,17 @@ import androidx.room.RoomDatabase
 import com.example.data.model.AttendanceRecord
 import com.example.data.model.LeaveBalance
 import com.example.data.model.LeaveRequest
+import com.example.data.model.Employee
 
 @Database(
-    entities = [AttendanceRecord::class, LeaveBalance::class, LeaveRequest::class],
-    version = 1,
+    entities = [AttendanceRecord::class, LeaveBalance::class, LeaveRequest::class, Employee::class],
+    version = 2,
     exportSchema = false
 )
 abstract class AppDatabase : RoomDatabase() {
     abstract fun attendanceDao(): AttendanceDao
     abstract fun leaveDao(): LeaveDao
+    abstract fun employeeDao(): EmployeeDao
 
     companion object {
         @Volatile
@@ -27,7 +29,9 @@ abstract class AppDatabase : RoomDatabase() {
                     context.applicationContext,
                     AppDatabase::class.java,
                     "zoho_people_hrms_db"
-                ).build()
+                )
+                .fallbackToDestructiveMigration()
+                .build()
                 INSTANCE = instance
                 instance
             }

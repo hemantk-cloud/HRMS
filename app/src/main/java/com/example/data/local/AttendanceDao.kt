@@ -9,11 +9,20 @@ interface AttendanceDao {
     @Query("SELECT * FROM attendance_records ORDER BY date DESC")
     fun getAllAttendance(): Flow<List<AttendanceRecord>>
 
+    @Query("SELECT * FROM attendance_records WHERE employeeEmail = :email ORDER BY date DESC")
+    fun getAttendanceForEmployee(email: String): Flow<List<AttendanceRecord>>
+
     @Query("SELECT * FROM attendance_records WHERE date = :date LIMIT 1")
     suspend fun getAttendanceForDate(date: String): AttendanceRecord?
 
+    @Query("SELECT * FROM attendance_records WHERE employeeEmail = :email AND date = :date LIMIT 1")
+    suspend fun getAttendanceForDateAndEmail(email: String, date: String): AttendanceRecord?
+
     @Query("SELECT * FROM attendance_records WHERE date = :date LIMIT 1")
     fun getAttendanceForDateFlow(date: String): Flow<AttendanceRecord?>
+
+    @Query("SELECT * FROM attendance_records WHERE employeeEmail = :email AND date = :date LIMIT 1")
+    fun getAttendanceForDateAndEmailFlow(email: String, date: String): Flow<AttendanceRecord?>
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertAttendance(record: AttendanceRecord)

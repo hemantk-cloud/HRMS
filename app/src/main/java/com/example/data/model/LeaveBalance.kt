@@ -5,7 +5,9 @@ import androidx.room.PrimaryKey
 
 @Entity(tableName = "leave_balances")
 data class LeaveBalance(
-    @PrimaryKey val leaveType: String, // Casual Leave, Sick Leave, Earned Leave, etc.
+    @PrimaryKey val id: String, // format: "email_leaveType"
+    val employeeEmail: String = "hemant.k@allen.in",
+    val leaveType: String, // Casual Leave, Sick Leave, Earned Leave, etc.
     val allocated: Float,
     val taken: Float
 ) {

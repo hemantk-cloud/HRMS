@@ -45,6 +45,12 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.data.model.AttendanceRecord
 import com.example.data.model.LeaveBalance
 import com.example.data.model.LeaveRequest
+import com.example.data.model.Employee
+import androidx.compose.ui.platform.LocalFocusManager
+import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.foundation.text.KeyboardActions
+import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.input.ImeAction
 import com.example.ui.viewmodel.HRMSViewModel
 import com.example.ui.viewmodel.LocationState
 import com.example.ui.viewmodel.OfficeLocation
@@ -55,7 +61,8 @@ import java.util.*
 enum class HRMSTab(val title: String, val selectedIcon: ImageVector, val unselectedIcon: ImageVector) {
     Attendance("Punch", Icons.Filled.Fingerprint, Icons.Outlined.Fingerprint),
     Summary("Summary", Icons.AutoMirrored.Filled.ListAlt, Icons.AutoMirrored.Outlined.ListAlt),
-    Leaves("Leaves", Icons.Filled.BeachAccess, Icons.Outlined.BeachAccess)
+    Leaves("Leaves", Icons.Filled.BeachAccess, Icons.Outlined.BeachAccess),
+    AdminPortal("Admin Panel", Icons.Filled.SupervisorAccount, Icons.Outlined.SupervisorAccount)
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -79,6 +86,12 @@ fun HRMSRootScreen(
     val currentLocationState by viewModel.currentLocationState.collectAsStateWithLifecycle()
     val selectedSimulationLocation by viewModel.selectedSimulationLocation.collectAsStateWithLifecycle()
     val currentWorkTicker by viewModel.currentWorkSessionTicker.collectAsStateWithLifecycle()
+    val loggedInUser by viewModel.loggedInUser.collectAsStateWithLifecycle()
+
+    if (loggedInUser == null) {
+        LoginScreen(viewModel = viewModel)
+        return
+    }
 
     // Listen to Toast events from ViewModel Flow
     LaunchedEffect(key1 = Unit) {
@@ -154,9 +167,22 @@ fun HRMSRootScreen(
                     }
                 },
                 actions = {
+                    // Logout button
+                    IconButton(
+                        onClick = { viewModel.logout() },
+                        modifier = Modifier.testTag("logout_btn")
+                    ) {
+                        Icon(
+                            imageVector = Icons.Filled.Logout,
+                            contentDescription = "Sign Out",
+                            tint = MaterialTheme.colorScheme.error.copy(alpha = 0.8f)
+                        )
+                    }
+
                     // Quick profile avatar visual info
                     IconButton(onClick = {
-                        Toast.makeText(context, "Officer: Hemant Kumar\nDesignation: Senior Lead Engineer", Toast.LENGTH_SHORT).show()
+                        val role = if (loggedInUser?.isAdmin == true) "Administrator" else "Employee"
+                        Toast.makeText(context, "Officer: ${loggedInUser?.name}\nID: ${loggedInUser?.emId}\nDepartment: ${loggedInUser?.department}\nRole: $role", Toast.LENGTH_LONG).show()
                     }) {
                         Box(
                             modifier = Modifier
@@ -165,11 +191,12 @@ fun HRMSRootScreen(
                                 .background(MaterialTheme.colorScheme.primaryContainer),
                             contentAlignment = Alignment.Center
                         ) {
+                            val initials = loggedInUser?.name?.split(" ")?.mapNotNull { it.firstOrNull() }?.joinToString("")?.take(2) ?: "HK"
                             Text(
-                                "HK",
+                                initials,
                                 fontWeight = FontWeight.Bold,
                                 color = MaterialTheme.colorScheme.onPrimaryContainer,
-                                fontSize = 13.sp
+                                fontSize = 12.sp
                             )
                         }
                     }
@@ -184,7 +211,12 @@ fun HRMSRootScreen(
                 modifier = Modifier.shadow(8.dp),
                 containerColor = MaterialTheme.colorScheme.surface
             ) {
-                HRMSTab.values().forEach { tab ->
+                val tabs = if (loggedInUser?.isAdmin == true) {
+                    HRMSTab.values().toList()
+                } else {
+                    HRMSTab.values().filter { it != HRMSTab.AdminPortal }
+                }
+                tabs.forEach { tab ->
                     NavigationBarItem(
                         selected = currentTab == tab,
                         onClick = { currentTab = tab },
@@ -221,7 +253,7 @@ fun HRMSRootScreen(
                 .background(MaterialTheme.colorScheme.background)
         ) {
             // Display User Profile Card
-            UserProfileHeader(todayAttendance)
+            UserProfileHeader(loggedInUser, todayAttendance)
 
             // Screen Selector with smooth transitions
             AnimatedContent(
@@ -229,6 +261,7 @@ fun HRMSRootScreen(
                 transitionSpec = {
                     fadeIn(animationSpec = tween(220)) togetherWith fadeOut(animationSpec = tween(220))
                 },
+                modifier = Modifier.weight(1f),
                 label = "screen_trans"
             ) { targetTab ->
                 when (targetTab) {
@@ -266,6 +299,11 @@ fun HRMSRootScreen(
                             requests = leaveRequests
                         )
                     }
+                    HRMSTab.AdminPortal -> {
+                        AdminPortalScreen(
+                            viewModel = viewModel
+                        )
+                    }
                 }
             }
         }
@@ -285,7 +323,7 @@ fun HRMSRootScreen(
 }
 
 @Composable
-fun UserProfileHeader(todayAttendance: AttendanceRecord?) {
+fun UserProfileHeader(loggedInUser: Employee?, todayAttendance: AttendanceRecord?) {
     val currentDateStr = remember {
         val sdf = SimpleDateFormat("EEEE, MMM dd", Locale.getDefault())
         sdf.format(Date())
@@ -308,7 +346,7 @@ fun UserProfileHeader(todayAttendance: AttendanceRecord?) {
             )
             Spacer(modifier = Modifier.height(2.dp))
             Text(
-                text = "Hi, Hemant",
+                text = "Hi, ${loggedInUser?.name?.split(" ")?.firstOrNull() ?: "Hemant"}",
                 fontSize = 24.sp,
                 fontWeight = FontWeight.Bold,
                 color = MaterialTheme.colorScheme.onSurface
@@ -353,8 +391,9 @@ fun UserProfileHeader(todayAttendance: AttendanceRecord?) {
                     .border(2.dp, Color.White, CircleShape),
                 contentAlignment = Alignment.Center
             ) {
+                val initials = loggedInUser?.name?.split(" ")?.mapNotNull { it.firstOrNull() }?.joinToString("")?.take(2) ?: "HK"
                 Text(
-                    "HK",
+                    initials,
                     fontWeight = FontWeight.Bold,
                     color = Color(0xFF2563EB),
                     fontSize = 14.sp
@@ -1236,16 +1275,14 @@ fun LeaveBalanceCardItem(bal: LeaveBalance) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Icon(
                         imageVector = when (bal.leaveType) {
-                            "Casual Leave" -> Icons.Filled.BeachAccess
-                            "Sick Leave" -> Icons.Filled.MedicalServices
-                            "Earned Leave" -> Icons.Filled.WorkHistory
+                            "Privilege Leave" -> Icons.Filled.Star
+                            "Compensatory Off" -> Icons.Filled.EventAvailable
                             else -> Icons.Filled.FlightTakeoff
                         },
                         contentDescription = "Leave Icon Type",
                         tint = when (bal.leaveType) {
-                            "Casual Leave" -> Color(0xFF2196F3)
-                            "Sick Leave" -> Color(0xFFE91E63)
-                            "Earned Leave" -> Color(0xFF4CAF50)
+                            "Privilege Leave" -> Color(0xFFF1C40F)
+                            "Compensatory Off" -> Color(0xFF2ECC71)
                             else -> MaterialTheme.colorScheme.primary
                         },
                         modifier = Modifier.size(20.dp)
@@ -1278,9 +1315,8 @@ fun LeaveBalanceCardItem(bal: LeaveBalance) {
                     .height(8.dp)
                     .clip(RoundedCornerShape(4.dp)),
                 color = when (bal.leaveType) {
-                    "Casual Leave" -> Color(0xFF2196F3)
-                    "Sick Leave" -> Color(0xFFE91E63)
-                    "Earned Leave" -> Color(0xFF4CAF50)
+                    "Privilege Leave" -> Color(0xFFF1C40F)
+                    "Compensatory Off" -> Color(0xFF2ECC71)
                     else -> MaterialTheme.colorScheme.primary
                 },
                 trackColor = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f),
@@ -1404,7 +1440,7 @@ fun ApplyLeaveDialog(
     onDismiss: () -> Unit,
     onSubmit: (leaveType: String, start: String, end: String, numDays: Float, reason: String) -> Unit
 ) {
-    var selectedType by remember { mutableStateOf(balances.firstOrNull()?.leaveType ?: "Casual Leave") }
+    var selectedType by remember { mutableStateOf(balances.firstOrNull()?.leaveType ?: "Privilege Leave") }
     var startDateStr by remember { mutableStateOf("") }
     var endDateStr by remember { mutableStateOf("") }
     var reason by remember { mutableStateOf("") }
@@ -1657,5 +1693,179 @@ fun formatDateString(dateStr: String): String {
         }
     } catch (e: Exception) {
         dateStr
+    }
+}
+
+@Composable
+fun LoginScreen(
+    viewModel: HRMSViewModel
+) {
+    var emailInput by remember { mutableStateOf("") }
+    var errorMessage by remember { mutableStateOf<String?>(null) }
+    val focusManager = LocalFocusManager.current
+    
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(MaterialTheme.colorScheme.background)
+            .padding(24.dp),
+        contentAlignment = Alignment.Center
+    ) {
+        Card(
+            modifier = Modifier
+                .fillMaxWidth()
+                .widthIn(max = 450.dp)
+                .animateContentSize(),
+            shape = RoundedCornerShape(28.dp),
+            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
+        ) {
+            Column(
+                modifier = Modifier
+                    .padding(32.dp)
+                    .fillMaxWidth(),
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
+                // Header Logo
+                Box(
+                    modifier = Modifier
+                        .size(64.dp)
+                        .clip(CircleShape)
+                        .background(MaterialTheme.colorScheme.primaryContainer),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(
+                        imageVector = Icons.Filled.People,
+                        contentDescription = "ALLEN HR Logo",
+                        tint = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.size(36.dp)
+                    )
+                }
+                
+                Spacer(modifier = Modifier.height(16.dp))
+                
+                // Display Title
+                Row(
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        text = "ALLEN",
+                        fontWeight = FontWeight.Black,
+                        color = MaterialTheme.colorScheme.primary,
+                        fontSize = 28.sp,
+                        letterSpacing = (-0.5).sp
+                    )
+                    Text(
+                        text = " HR",
+                        fontWeight = FontWeight.Medium,
+                        color = MaterialTheme.colorScheme.onSurface,
+                        fontSize = 28.sp,
+                        letterSpacing = (-0.5).sp
+                    )
+                }
+                
+                Text(
+                    text = "Professional Enterprise Portal",
+                    fontSize = 12.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
+                    letterSpacing = 1.sp
+                )
+                
+                Spacer(modifier = Modifier.height(32.dp))
+                
+                // Email Field
+                OutlinedTextField(
+                    value = emailInput,
+                    onValueChange = { 
+                        emailInput = it
+                        errorMessage = null 
+                    },
+                    label = { Text("Official Email ID") },
+                    placeholder = { Text("e.g. hemant.k@allen.in") },
+                    singleLine = true,
+                    shape = RoundedCornerShape(12.dp),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .testTag("login_email_input"),
+                    leadingIcon = {
+                        Icon(
+                            imageVector = Icons.Filled.Email,
+                            contentDescription = "Email Icon"
+                        )
+                    },
+                    keyboardOptions = KeyboardOptions(
+                        keyboardType = KeyboardType.Email,
+                        imeAction = ImeAction.Done
+                    ),
+                    keyboardActions = KeyboardActions(
+                        onDone = { focusManager.clearFocus() }
+                    ),
+                    isError = errorMessage != null
+                )
+                
+                if (errorMessage != null) {
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Text(
+                        text = errorMessage ?: "",
+                        color = MaterialTheme.colorScheme.error,
+                        fontSize = 12.sp,
+                        modifier = Modifier.align(Alignment.Start)
+                    )
+                }
+                
+                Spacer(modifier = Modifier.height(24.dp))
+                
+                // Sign In Button
+                Button(
+                    onClick = {
+                        focusManager.clearFocus()
+                        viewModel.loginWithEmail(emailInput) { success, msg ->
+                            if (!success) {
+                                errorMessage = msg
+                            }
+                        }
+                    },
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(50.dp)
+                        .testTag("login_submit_btn"),
+                    shape = RoundedCornerShape(14.dp)
+                ) {
+                    Text(
+                        "Sign In Securely",
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 16.sp
+                    )
+                }
+                
+                Spacer(modifier = Modifier.height(24.dp))
+                
+                // Help instruction block
+                Surface(
+                    color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.3f),
+                    shape = RoundedCornerShape(16.dp),
+                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.6f))
+                ) {
+                    Column(
+                        modifier = Modifier.padding(16.dp)
+                    ) {
+                        Text(
+                            text = "Admin Access Account Setup",
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 12.sp,
+                            color = MaterialTheme.colorScheme.primary
+                        )
+                        Spacer(modifier = Modifier.height(4.dp))
+                        Text(
+                            text = "Official Email logins are managed by the admin roster. To log in initially as the admin and create other employee accounts, use:\n\n👉 hemant.k@allen.in",
+                            fontSize = 11.sp,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            lineHeight = 16.sp
+                        )
+                    }
+                }
+            }
+        }
     }
 }

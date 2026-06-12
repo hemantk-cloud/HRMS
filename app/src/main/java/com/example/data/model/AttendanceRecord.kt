@@ -6,10 +6,11 @@ import androidx.room.PrimaryKey
 
 @Entity(
     tableName = "attendance_records",
-    indices = [Index(value = ["date"], unique = true)]
+    indices = [Index(value = ["employeeEmail", "date"], unique = true)]
 )
 data class AttendanceRecord(
     @PrimaryKey(autoGenerate = true) val id: Int = 0,
+    val employeeEmail: String = "hemant.k@allen.in",
     val date: String, // format: YYYY-MM-DD
     val punchInTime: Long, // timestamp
     val punchOutTime: Long? = null, // timestamp
