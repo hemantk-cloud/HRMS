@@ -120,20 +120,20 @@ fun HRMSRootScreen(
                     ) {
                         Icon(
                             imageVector = Icons.Filled.People,
-                            contentDescription = "Zoho People Logo",
+                            contentDescription = "ALLEN HR Logo",
                             tint = MaterialTheme.colorScheme.primary,
                             modifier = Modifier.size(28.dp)
                         )
                         Spacer(modifier = Modifier.width(8.dp))
                         Text(
-                            text = "zoho",
+                            text = "ALLEN",
                             fontWeight = FontWeight.Black,
                             color = MaterialTheme.colorScheme.primary,
                             fontFamily = FontFamily.SansSerif,
                             fontSize = 24.sp
                         )
                         Text(
-                            text = " people",
+                            text = " HR",
                             fontWeight = FontWeight.Medium,
                             color = MaterialTheme.colorScheme.onSurface,
                             fontFamily = FontFamily.SansSerif,
